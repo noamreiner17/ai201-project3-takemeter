@@ -1,5 +1,5 @@
 
-#Defining the labels
+# Defining the labels
 
 | Label | Scope | Grounded Criteria |
 | :--- | :--- | :--- |
