@@ -34,7 +34,7 @@ The chosen community is **r/television**, a text-heavy subreddit focused on tele
 #### Edge Case 1: The Opinionated Rumor (`reaction_opinion` vs. `news` / `speculation`)
 * **Uncertain Post:** *"Rumors are circulating online that Marvel is looking to recast the lead actor for the upcoming series because of scheduling conflicts, which would honestly ruin the entire project."*
 * **The Ambiguity:** It mentions a real-world industry situation (`news`), guesses at the future of an unreleased project (`speculation`), and ends with a heavy value judgment (`reaction_opinion`).
-* **Decision Rule:** If a post contains a personal, subjective value judgment (e.g., "ruin", "bad", "terrible", "love"*), classify it as `reaction_opinion` — unless the post is a direct, unaltered link to a reputable trade article. If a user paraphrases a rumor and adds their emotional take, the text signal is fundamentally an opinion.
+* **Decision Rule:** If a post contains a personal, subjective value judgment (e.g., "ruin", "bad", "terrible", "love"), classify it as `reaction_opinion` — unless the post is a direct, unaltered link to a reputable trade article. If a user paraphrases a rumor and adds their emotional take, the text signal is fundamentally an opinion.
 * **Final Verdict:** `reaction_opinion`
 
 #### Edge Case 2: The Soft Announcement (`news` vs. `speculation`)
@@ -73,9 +73,39 @@ To thoroughly measure model performance, relying on global accuracy alone is ins
 ### Deployment Requirements
 For this classifier to be genuinely useful as a practical moderation or user-facing filtering tool on Reddit, it must reliably filter out low-effort chatter without accidentally suppressing genuine, breaking news. 
 
-### Acceptable Benchmarks for Success ("Good Enough" Criteria)
-* **Overall Macro F1-Score:** **$\ge 0.75$**. Given the inherent conversational ambiguity between text-based speculation and raw opinions, an F1-score hitting or crossing 75% represents an excellent benchmark for baseline deployment.
+### Objective and Specific Criteria for Success
+At the end of evaluation, success will be determined objectively by checking if the fine-tuned model hits or exceeds the following independent thresholds on the held-out test set:
 
-* **`news` Class Precision:** **$\ge 0.85$**. The model must maintain a strict true-positive accuracy threshold for news. If it misclassifies subjective user arguments as "confirmed news," it ruins the operational trust of the filter tool.
+1. **Overall Macro F1-Score:** **$\ge 0.75$**. This calculates the F1-score for all three classes individually and takes their unweighted mean. Hitting $\ge 0.75$ mathematically guarantees that performance remains stable across both common classes (`reaction_opinion`) and more elusive classes (`speculation`).
 
-* **Operational Goal:** If these numbers are hit, the model will be considered ready to power an experimental web dashboard interface where a user can toggle checkboxes to view *only* verified updates (`news`) or *only* narrative brainstorms (`speculation`), filtering out generic internet noise.
+2. **`news` Class Precision:** **$\ge 0.85$**. Defined precisely as `True News Predictions ÷ (True News + False News Predictions)`. This constraint forces the model to keep its False Positive rate for news below 15%, ensuring that the "Facts-Only" feed option remains clean and completely free of subjective noise or rumor threads.
+
+3. **Per-Class Accuracy Floors:**
+   * `news` Accuracy: $\ge 0.80$
+   * `reaction_opinion` Accuracy: $\ge 0.80$
+   * `speculation` Accuracy: $\ge 0.65$ (Allowing a lower floor due to smaller sample representations and linguistic crossover with opinions).
+
+### Operational Goal
+If all three criteria are met, the classifier will be deemed "good enough" for production deployment. It will be implemented inside a user-facing dashboard where users can cleanly toggle checkboxes to see *only* verified industrial updates (`news`) or *only* narrative brainstorms (`speculation`), effectively eliminating generic internet noise.
+
+---
+
+## 5. AI Tool Plan
+
+Because this is a data-centric and design-centric project, Gemini will be utilized at three specific bottlenecks to test, accelerate, and refine our data workflows.
+
+### 1. Label Stress-Testing
+
+* **Workflow:** Before annotating the full 200-post dataset, I will input our current label definitions, guidelines, and known edge cases into Gemini. I will prompt Gemini to leverage its integrated Google Search capabilities to find or generate 5–10 highly realistic, ambiguous posts that sit directly on the boundary lines between `news` vs. `speculation` and `reaction_opinion` vs. `speculation`.
+
+* **Action Item:** If Gemini returns boundary examples that cannot be confidently sorted into a single category using our current decision boundaries, I will pause and tighten the text taxonomy *before* beginning human annotation.
+
+### 2. Annotation Assistance
+* **Workflow:** To establish an efficient data pipeline, I will use Gemini to pre-label an initial raw batch of 50 crawled examples. I will pass the text along with our exact Markdown taxonomy table and instructions to output labels in a structured CSV format.
+
+* **Verification & Disclosure:** I will manually audit 100% of Gemini's outputs against our ground-truth rules to correct any systemic hallucinations or misclassifications. In the data spreadsheet, a tracking column titled `is_prelabeled_by_ai` (Boolean: `TRUE`/`FALSE`) will be maintained to explicitly log and disclose AI usage for data curation.
+
+### 3. Failure Analysis
+* **Workflow:** Following model evaluation, I will isolate all rows from our test set where the fine-tuned model's predictions mismatched the ground-truth labels. I will feed this collection of misclassified texts into Gemini.
+
+* **Analysis & Verification:** I will instruct Gemini to perform an algorithmic review to discover underlying linguistic patterns—such as identifying specific trigger tokens, syntactic constructions, or hidden entity cross-overs that systematically caused the model to fail. I will manually cross-verify Gemini’s findings against our confusion matrix to check for directional error patterns before compiling the final performance report.
