@@ -241,6 +241,10 @@ labels are mine.
 **Failure analysis:** I had an LLM find themes across the 6 errors; I kept the
 two that matched the matrix and discarded the false "short posts" theme (§2.5).
 
+## 8. Demo
+
+Loom link: https://www.loom.com/share/d137f7421aee4273861aeda60acb35a4
+
 ## Files
 
 - [planning.md](planning.md) — design notes & edge cases
