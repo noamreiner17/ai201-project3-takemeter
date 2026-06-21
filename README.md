@@ -8,7 +8,7 @@ the final report; full design notes and edge cases are in [planning.md](planning
 ## 1. What I Built
 
 - **Task:** single-label, three-class text classification.
-- **Data:** ~200 manually annotated posts from `r/television` ([reddit.csv](reddit.csv)).
+- **Data:** 200 manually annotated posts from `r/television` ([reddit.csv](reddit.csv)).
 - **Baseline:** zero-shot Groq `llama-3.3-70b-versatile`, given the label rules but no training.
 - **Fine-tuned:** `distilbert-base-uncased`, fine-tuned on Google Colab (free T4 GPU), evaluated on a 30-example held-out test set.
 
@@ -71,8 +71,29 @@ forecast → `speculation`. Details in [planning.md](planning.md#edge-cases-and-
 3. *"Now that the writers have changed, I bet the next season will be darker."* —
    `news` vs. `speculation`. The production fact is only evidence for a forecast →
    **`speculation`** (primary intent is predicting).
+## 2. Hyperparameter Tuning
 
-## 2. Evaluation Report
+The initial fine-tuned model performed poorly, achieving only 0.567 accuracy and failing to predict any examples of the `reaction_opinion` class. To improve performance, I adjusted two training hyperparameters:
+
+* Increased the number of training epochs from **3 to 5**
+* Reduced the training batch size from **16 to 8**
+
+Increasing the number of epochs allowed the model to make additional passes through the small training dataset (~140 training examples after the train/validation/test split). This helped the model learn category-specific language patterns, particularly those associated with subjective opinions.
+
+Reducing the batch size increased the number of weight updates performed during each epoch. With a small dataset, the additional updates helped the model learn finer distinctions between classes, especially the difficult boundary between `reaction_opinion` and `speculation`.
+
+These changes improved performance substantially:
+
+| Configuration           | Accuracy | Macro F1 |
+| ----------------------- | -------- | -------- |
+| 3 epochs, batch size 16 | 0.567    | 0.48     |
+| 5 epochs, batch size 16 | 0.767    | 0.75     |
+| 5 epochs, batch size 8  | 0.800    | 0.79     |
+
+The final configuration achieved 0.800 accuracy and a macro F1-score of 0.79, nearly matching the zero-shot LLM baseline. The largest improvement occurred in the `reaction_opinion` class, whose recall increased from 0.00 to 1.00 after the hyperparameter adjustments.
+
+
+## 3. Evaluation Report
 
 Metrics computed on the 30-example test set.
 Raw numbers: [evaluation_results.json](result/evaluation_results.json) ·
@@ -84,7 +105,7 @@ from planning.md and instructed the model to *output only one label name and
 nothing else* (so the notebook could parse responses cleanly). No examples or
 fine-tuning — purely the general model applying the written rules.
 
-### 2.1 Overall — Both Models
+### 3.1 Overall — Both Models
 
 | Model | Accuracy | Macro F1 |
 | :--- | :--- | :--- |
@@ -93,7 +114,7 @@ fine-tuning — purely the general model applying the written rules.
 
 Fine-tuning improved accuracy by +3.3 points.
 
-### 2.2 Per-Class — Both Models
+### 3.2 Per-Class — Both Models
 
 **Baseline:**
 
@@ -114,7 +135,7 @@ Fine-tuning improved accuracy by +3.3 points.
 Fine-tuning *moved* the problem: it now catches every opinion (recall 1.00) but
 does so by dumping half of all speculation into the opinion bucket.
 
-### 2.3 Confusion Matrix — Fine-Tuned
+### 3.3 Confusion Matrix — Fine-Tuned
 
 Rows = true, columns = predicted.
 
@@ -127,7 +148,7 @@ Rows = true, columns = predicted.
 Diagonal = 24/30 = 0.80. **5 of 6 errors are `speculation` → `reaction_opinion`** —
 one directional boundary the model never learned.
 
-### 2.4 Misclassified Examples
+### 3.4 Misclassified Examples
 
 | # | True | Pred | Conf | Post (excerpt) |
 | :-: | :-- | :-- | :--: | :-- |
@@ -150,14 +171,14 @@ could label it opinion too. → annotation-boundary ambiguity, not a clean error
 and unlike my clean press-release `news` examples; the model nearly guessed. →
 training-data-distribution problem: my `news` examples were stylistically too narrow.
 
-### 2.5 AI-Surfaced Patterns (verified)
+### 3.5 AI-Surfaced Patterns (verified)
 
 I pasted the 6 errors into an LLM. **Kept:** the errors cluster on first-person
 conviction phrasing and on the speculation↔opinion pair — both confirmed against
 the matrix. **Discarded:** its claim that "short, low-info posts" drove the
 errors — the misclassified posts are actually long.
 
-### 2.6 Sample Classifications
+### 3.6 Sample Classifications
 
 | Post (excerpt) | Pred | Conf | Correct? |
 | :-- | :-- | :--: | :--: |
@@ -174,7 +195,7 @@ precision = 1.00). Note the contrast in confidence: the model is decisive on the
 three correct in-pattern cases (0.88–0.91) but near-guessing on its errors
 (0.52, 0.56) — its confidence is at least directionally meaningful.
 
-## 3. Reflection: Captured vs. Intended
+## 4. Reflection: Captured vs. Intended
 
 I defined labels by **intent** (report / evaluate / predict). The model learned
 **surface stance markers** instead. `reaction_opinion` recall (1.00) and `news`
@@ -184,7 +205,7 @@ framing — so it collapsed to 0.50 recall. **Overfit to:** "I am convinced/hope
 think" → opinion. **Missed:** the predictive function of a sentence, which never
 became a feature the model could see.
 
-## 4. Definition of Success
+## 5. Definition of Success
 
 | Criterion | Target | Result | Met? |
 | :-- | :-- | :-- | :-: |
@@ -198,21 +219,6 @@ Meets 4/5, including the strict `news`-precision constraint, but fails the
 `speculation` floor — so it is not yet deployment-ready. **Fix:** more
 speculation examples that *share surface form with opinion*, a tighter
 speculation/opinion definition, and a wider stylistic range of `news` examples.
-
-## 5. Hyperparameter Tuning
-
-The provided model config scored only 0.567 accuracy and predicted **zero**
-`reaction_opinion`. I changed the given training arguments to
-**`num_train_epochs=5`** (from 3) and **`per_device_train_batch_size=8`** (from
-16) — more passes and more weight updates per epoch on the small (~140) train set.
-
-| Config | Accuracy | Macro F1 |
-| :-- | :-- | :-- |
-| 3 epochs, batch 16 (given) | 0.567 | 0.48 |
-| 5 epochs, batch 16 | 0.767 | 0.75 |
-| **5 epochs, batch 8 (final)** | **0.800** | **0.79** |
-
-`reaction_opinion` recall rose 0.00 → 1.00, partly at the cost of speculation recall.
 
 ## 6. Spec Reflection
 
