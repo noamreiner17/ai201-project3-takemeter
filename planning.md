@@ -43,6 +43,55 @@ The chosen community is **r/television**, a text-heavy subreddit focused on tele
 * **Decision Rule:** If the primary intent of the post text is to guess an unconfirmed future event based on a clue, classify it as `speculation`. It only qualifies as `news` if the event or announcement is confirmed as factual by the source.
 * **Final Verdict:** `speculation`
 
+
+### Additional Difficult Annotation Cases Encountered During Data Collection
+
+#### Difficult Case 1: News Mixed with Personal Opinion
+
+**Post:** "With the news breaking that Russell T Davies is leaving, I think the show is going to lose its identity."
+
+**Possible Labels:** `news`, `reaction_opinion`
+
+**Decision:** `reaction_opinion`
+
+**Reasoning:** Although the post references a factual event, the primary purpose of the text is to express a subjective judgment about the future of the show. According to the taxonomy, personal evaluations take precedence over reporting facts.
+
+---
+
+#### Difficult Case 2: Evidence-Based Prediction
+
+**Post:** "Everyone thought Mephisto would appear because the clues were everywhere, and I still think Marvel is setting him up for next season."
+
+**Possible Labels:** `reaction_opinion`, `speculation`
+
+**Decision:** `speculation`
+
+**Reasoning:** The post references past evidence, but its main objective is predicting an unconfirmed future event. Since the prediction is the central claim, it was classified as speculation.
+
+---
+
+#### Difficult Case 3: Strongly Worded Fan Theory
+
+**Post:** "It is obvious to me that Alpha's daughter has been working with the enemy the entire time."
+
+**Possible Labels:** `reaction_opinion`, `speculation`
+
+**Decision:** `speculation`
+
+**Reasoning:** The phrase "it is obvious to me" resembles an opinion, but the core content is a theory about hidden plot events that have not been confirmed. The post was therefore labeled as speculation.
+
+---
+
+#### Difficult Case 4: Production News Used for Forecasting
+
+**Post:** "Now that the writers have changed, I bet the next season will be much darker."
+
+**Possible Labels:** `news`, `speculation`
+
+**Decision:** `speculation`
+
+**Reasoning:** The factual production change serves only as evidence for a prediction about future content. Because the post's primary intent is forecasting an outcome, it was labeled as speculation.
+
 ---
 
 ## 2. Data Collection Plan
@@ -51,7 +100,7 @@ The chosen community is **r/television**, a text-heavy subreddit focused on tele
 The data will be collected from active threads within the `r/television` subreddit. Post titles and top-level comment text will be compiled and organized into a structured spreadsheet/CSV pipeline. 
 
 ### Volume Goals
-The goal is to annotate a minimum baseline dataset of **200 distinct examples**. To ensure balance across the categories, the target breakdown is **70-80 examples per label**.
+The goal is to annotate a minimum baseline dataset of **200 distinct examples**. To ensure balance across the categories, the target breakdown is **60-80 examples per label**.
 
 ### Mitigation for Underrepresented Labels
 If certain categories (such as `speculation` or `news`) are lagging after an initial collection pass:
@@ -62,9 +111,15 @@ If certain categories (such as `speculation` or `news`) are lagging after an ini
 
 ## 3. Evaluation Metrics
 
-To thoroughly measure model performance, relying on global accuracy alone is insufficient. Because the dataset size is small and text patterns can vary wildly, I will track the following targeted multi-class evaluation parameters:
-* **Per-Class Accuracy:** This will serve as our primary multi-class metric (calculated as `correct [class] predictions ÷ total [class] episodes in test set`). This reveals what global accuracy hides, ensuring that a high score in `reaction_opinion` doesn't mask a total failure to learn the `speculation` class.
-* **Directional Error Analysis (via Confusion Matrix):** We will track the asymmetry of misclassifications (e.g., how often `speculation` leaks into `reaction_opinion` vs. vice versa). Asymmetrically skewed errors will diagnose exactly where our label boundaries are underspecified in the training data.
+To thoroughly measure model performance, relying on overall accuracy alone is insufficient. Because this is a multi-class classification problem, I will evaluate the model using:
+
+* Overall Accuracy
+* Per-Class Precision
+* Per-Class Recall
+* Per-Class F1-Score
+* Confusion Matrix Analysis
+
+Per-class metrics are especially important because they reveal whether the model is learning all three categories equally well. For example, a high overall accuracy could hide poor performance on the speculation class if reaction_opinion dominates predictions. The confusion matrix will be used to identify systematic misclassifications between label pairs.
 
 ---
 
@@ -92,7 +147,7 @@ If all three criteria are met, the classifier will be deemed "good enough" for p
 
 ## 5. AI Tool Plan
 
-Because this is a data-centric and design-centric project, Gemini will be utilized at three specific bottlenecks to test, accelerate, and refine our data workflows.
+Because this is a data-centric and design-centric project, Gemini (as Google based LLM) will be utilized at three specific bottlenecks to test, accelerate, and refine our data workflows.
 
 ### 1. Label Stress-Testing
 
